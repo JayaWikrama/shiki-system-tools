@@ -364,7 +364,8 @@ int8_t ssys_get_keyboard_plug_status(){
     if (list_event == NULL) {
         return -1;
     }
-    char dir_name[128];
+    int8_t num_of_event = 0;
+    char dir_name[256];
     memset(dir_name, 0x00, 256*sizeof(char));
     uint16_t i = 0;
     uint8_t idx_char = 0;
@@ -378,8 +379,7 @@ int8_t ssys_get_keyboard_plug_status(){
              ssys_check_text_in_file(file_full_path, "KEYBOARD") == 0
             ){
                 ssys_debug(__func__, "INFO", "keyboard detected\n");
-                free(list_event);
-                return 0;
+                num_of_event++;
             }
             memset(dir_name, 0x00, 256*sizeof(char));
             idx_char = 0;
@@ -390,7 +390,10 @@ int8_t ssys_get_keyboard_plug_status(){
         }
     }
     free(list_event);
-    return -1;
+    if (num_of_event == 0){
+        return -1;
+    }
+    return num_of_event;
 }
 
 static int *ssys_keyboard_thread(void *ptr){
