@@ -697,6 +697,7 @@ int8_t ssys_check_text_in_file(char *_file, char *_keyword){
     }
 
     while ((character = fgetc(f_check)) != EOF){
+        if (character < 1 || character > 127) break;
         for (i=0; i<strlen(_keyword) - 1; i++){
             buff[i] = buff[i + 1];
         }
