@@ -20,6 +20,7 @@
 #include <stdlib.h>
 #include <linux/input.h>
 #include <openssl/md5.h>
+#include <openssl/aes.h>
 #include "shiki-system-tools.h"
 
 int8_t ssys_debug_mode_status = 1;
@@ -31,60 +32,51 @@ static char *ssys_list_dir(char *_dir_path, uint8_t _type);
 
 static void ssys_debug(const char *function_name, char *debug_type, char *debug_msg, ...){
 	if (ssys_debug_mode_status == 1 || strcmp(debug_type, "INFO") != 0){
-        struct tm *d_tm;
+        struct tm *d_tm = NULL;
         struct timeval tm_debug;
         uint16_t msec = 0;
-	    va_list aptr;
 		
 	    gettimeofday(&tm_debug, NULL);
 	    d_tm = localtime(&tm_debug.tv_sec);
         msec = tm_debug.tv_usec/1000;
-	
-	    char* tmp_debug_msg;
-        tmp_debug_msg = (char *) malloc(256*sizeof(char));
-        if (tmp_debug_msg == NULL){
-            printf("%02d-%02d-%04d %02d:%02d:%02d.%03i ERROR: %s: failed to allocate debug variable memory",
-             d_tm->tm_mday, d_tm->tm_mon+1, d_tm->tm_year+1900, d_tm->tm_hour, d_tm->tm_min, d_tm->tm_sec, msec, __func__
-            );
-            return;
-        }
-	    va_start(aptr, debug_msg);
-	    vsprintf(tmp_debug_msg, debug_msg, aptr);
-	    va_end(aptr);
+
         #ifdef __linux__
             if (strcmp(debug_type, "INFO")==0)
-                printf("\033[1;32m%02d-%02d-%04d %02d:%02d:%02d.%03d\033[1;34m SSYS\033[1;32m %s: %s: %s\033[0m",
+                printf("%02d-%02d-%04d %02d:%02d:%02d.%03d\033[0;34m SSYS\033[1;32m %s\033[0m %s: ",
                  d_tm->tm_mday, d_tm->tm_mon+1, d_tm->tm_year+1900, d_tm->tm_hour, d_tm->tm_min, d_tm->tm_sec,
-                 msec, debug_type, function_name, tmp_debug_msg
+                 msec, debug_type, function_name
                 );
             if (strcmp(debug_type, "WEBSERVER INFO")==0)
-                printf("\033[1;32m%02d-%02d-%04d %02d:%02d:%02d.%03d\033[1;34m SSYS\033[1;32m %s: %s: %s\033[0m",
+                printf("%02d-%02d-%04d %02d:%02d:%02d.%03d\033[0;34m SSYS\033[1;32m %s\033[0m %s: ",
                  d_tm->tm_mday, d_tm->tm_mon+1, d_tm->tm_year+1900, d_tm->tm_hour, d_tm->tm_min, d_tm->tm_sec,
-                 msec, debug_type, function_name, tmp_debug_msg
+                 msec, debug_type, function_name
                 );
     	    else if (strcmp(debug_type, "WARNING")==0)
-                printf("\033[1;33m%02d-%02d-%04d %02d:%02d:%02d.%03d\033[1;34m SSYS\033[1;33m %s: %s: %s\033[0m",
+                printf("%02d-%02d-%04d %02d:%02d:%02d.%03d\033[0;34m SSYS\033[1;33m %s\033[0m %s: ",
                  d_tm->tm_mday, d_tm->tm_mon+1, d_tm->tm_year+1900, d_tm->tm_hour, d_tm->tm_min, d_tm->tm_sec,
-                 msec, debug_type, function_name, tmp_debug_msg
+                 msec, debug_type, function_name
                 );
     	    else if (strcmp(debug_type, "ERROR")==0)
-                printf("\033[1;31m%02d-%02d-%04d %02d:%02d:%02d.%03d\033[1;34m SSYS\033[1;31m %s: %s: %s\033[0m",
+                printf("%02d-%02d-%04d %02d:%02d:%02d.%03d\033[0;34m SSYS\033[1;31m %s\033[0m %s: ",
                  d_tm->tm_mday, d_tm->tm_mon+1, d_tm->tm_year+1900, d_tm->tm_hour, d_tm->tm_min, d_tm->tm_sec,
-                 msec, debug_type, function_name, tmp_debug_msg
+                 msec, debug_type, function_name
                 );
             else if (strcmp(debug_type, "CRITICAL")==0)
-                printf("\033[1;31m%02d-%02d-%04d %02d:%02d:%02d.%03d\033[1;34m SSYS\033[1;31m %s: %s: %s\033[0m",
+                printf("%02d-%02d-%04d %02d:%02d:%02d.%03d\033[0;34m SSYS\033[1;31m %s\033[0m %s: ",
                  d_tm->tm_mday, d_tm->tm_mon+1, d_tm->tm_year+1900, d_tm->tm_hour, d_tm->tm_min, d_tm->tm_sec,
-                 msec, debug_type, function_name, tmp_debug_msg
+                 msec, debug_type, function_name
                 );
 	    #else
-            printf("%02d-%02d-%04d %02d:%02d:%02d.%03d %s: %s: %s",
+            printf("%02d-%02d-%04d %02d:%02d:%02d.%03d %s: %s: ",
              d_tm->tm_mday, d_tm->tm_mon+1, d_tm->tm_year+1900, d_tm->tm_hour, d_tm->tm_min, d_tm->tm_sec,
-             msec, debug_type, function_name, tmp_debug_msg
+             msec, debug_type, function_name
             );
         #endif
-        free(tmp_debug_msg);
-        tmp_debug_msg = NULL;
+
+        va_list aptr;
+        va_start(aptr, debug_msg);
+	    vfprintf(stdout, debug_msg, aptr);
+	    va_end(aptr);
     }
 }
 
@@ -837,19 +829,16 @@ int8_t ssys_get_checksum_of_file(char *_file_name, unsigned char *_checksum_outp
 	FILE *fd_sum = NULL;
     fd_sum = fopen(_file_name, "rb");
 	if (fd_sum == NULL){
-		ssys_debug(__func__, "ERROR", "fail to open file");
+		ssys_debug(__func__, "ERROR", "fail to open file\n");
 		return -1;
 	}
-
-	MD5_CTX context;
-	MD5_Init(&context);
 
 	int bytes = 0;
 	unsigned char *data = NULL;
 	unsigned char *sum = NULL;
 	unsigned char *md5_sum = NULL;
 
-	data = (unsigned char *) malloc(1024*sizeof(char));
+	data = (unsigned char *) malloc(512*sizeof(char));
 	if (data == NULL){
 		ssys_debug(__func__, "ERROR", "failed to allocate data memory\n");
 		return -1;
@@ -871,13 +860,17 @@ int8_t ssys_get_checksum_of_file(char *_file_name, unsigned char *_checksum_outp
 		return -1;
 	}
 
-	while ((bytes = fread(data, 1, 1024, fd_sum)) != 0){
+    MD5_CTX context;
+	MD5_Init(&context);
+
+	while ((bytes = fread(data, 1, 512, fd_sum)) != 0){
 		MD5_Update(&context, data, bytes);
-		MD5_Final(sum, &context);
 	}
 
+    MD5_Final(sum, &context);
+
 	memset(md5_sum, 0x00, 33*sizeof(char));
-	for (int i=0; i< MD5_DIGEST_LENGTH; i++){
+	for (int i=0; i < MD5_DIGEST_LENGTH; i++){
 		sprintf((char *) &md5_sum[i*2], "%02x", (unsigned int)sum[i]);
 	}
 	fclose(fd_sum);
@@ -928,6 +921,182 @@ int8_t ssys_get_checksum(unsigned char *_input, unsigned char *_checksum_output)
     sum = NULL;
     md5_sum = NULL;
 	return 0;
+}
+
+char *ssys_encode_base64(unsigned char *_buff, size_t _length){
+    char *result = NULL;
+    size_t result_size = _length + 1;
+    result = (char *) malloc(result_size * sizeof(char));
+    if (result == NULL){
+        ssys_debug(__func__, "ERROR", "failed to allocate memmory\n");
+        return NULL;
+    }
+    memset(result, 0x00, result_size * sizeof(char));
+
+    char charset[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    int index = 0;
+    int no_of_bits = 0;
+    int padding = 0;
+    int val = 0;
+    int count = 0;
+    int temp = 0;
+    int i, j;
+    int idx_result = 0; 
+
+    for (i = 0; i < _length; i += 3){ 
+        val = 0;
+        count = 0;
+        no_of_bits = 0;
+        for (j = i; j < _length && j <= i + 2; j++){
+            val = val << 8;
+            val = val | _buff[j];
+            count++;
+        } 
+        no_of_bits = count * 8;
+        padding = no_of_bits % 3;
+        while (no_of_bits != 0){
+            if (no_of_bits >= 6){ 
+                temp = no_of_bits - 6;
+                index = (val >> temp) & 63;  
+                no_of_bits -= 6;          
+            } 
+            else{ 
+                temp = 6 - no_of_bits;
+                index = (val << temp) & 63;  
+                no_of_bits = 0; 
+            }
+            if (result_size <= idx_result + 2){
+                result_size += 8;
+                result = (char *) realloc(result, result_size * sizeof(char));
+            }
+            result[idx_result++] = charset[index];
+        } 
+    }
+    for (i = 1; i <= padding; i++)  
+    { 
+        if (result_size <= idx_result + 2){
+            result_size += 8;
+            result = (char *) realloc(result, result_size * sizeof(char));
+        }
+        result[idx_result++] = '=';
+    }
+    result[idx_result] = 0x00;
+    return result;
+}
+
+unsigned char *ssys_decode_base64(unsigned char *_buff, size_t _length){
+    unsigned char *result = NULL;
+    size_t result_size = _length + 1;
+    result = (unsigned char *) malloc(result_size * sizeof(unsigned char));
+    if (result == NULL){
+        ssys_debug(__func__, "ERROR", "failed to allocate memmory\n");
+        return NULL;
+    }
+    memset(result, 0x00, result_size * sizeof(char));
+
+    int i = 0;
+    int j = 0;
+    int idx_result = 0;  
+    int num = 0;
+    int count_bits = 0;
+    for (i = 0; i < _length; i += 4){ 
+        num = 0, count_bits = 0;
+        for (j = 0; j < 4; j++){
+            if (_buff[i + j] != '='){
+                num = num << 6;
+                count_bits += 6;
+            }
+            if (_buff[i + j] >= 'A' && _buff[i + j] <= 'Z'){
+                num = num | (_buff[i + j] - 'A');
+            }
+            else if (_buff[i + j] >= 'a' && _buff[i + j] <= 'z'){
+                num = num | (_buff[i + j] - 'a' + 26);
+            }
+            else if (_buff[i + j] >= '0' && _buff[i + j] <= '9'){
+                num = num | (_buff[i + j] - '0' + 52);
+            }
+            else if (_buff[i + j] == '+'){
+                num = num | 62;
+            }
+            else if (_buff[i + j] == '/'){
+                num = num | 63;
+            }
+            else if (_buff[i + j] == 0x00 ||
+             _buff[i + j] == '='
+            ) { 
+                num = num >> 2; 
+                count_bits -= 2; 
+            }
+            else {
+                free(result);
+                result = NULL;
+                return NULL;
+            }
+        } 
+        while (count_bits != 0) { 
+            count_bits -= 8;
+            if (result_size <= idx_result + 2){
+                result_size += 8;
+                result = (unsigned char *) realloc(result, result_size * sizeof(unsigned char));
+            }
+            result[idx_result++] = (num >> count_bits) & 0xFF;
+        } 
+    }
+    result[idx_result] = 0x00;
+    return result;
+}
+
+unsigned char *ssys_encrypt_aes_cbc(
+ const unsigned char *_input_data,
+ const unsigned char *_encrypt_key,
+ const unsigned char *_iv,
+ uint16_t _data_size
+){
+    if (_input_data == NULL){
+        ssys_debug(__func__, "ERROR", "null data\n");
+        return NULL;
+    }
+    unsigned char *data_enc = NULL;
+    data_enc = (unsigned char *) malloc((_data_size + 1) * sizeof(unsigned char));
+    if (data_enc == NULL){
+        ssys_debug(__func__, "ERROR", "failed to allocate memory\n");
+        return NULL;
+    }
+
+    memset(data_enc, 0x00, (_data_size + 1) * sizeof(unsigned char));
+    AES_KEY enc_key;
+    unsigned char iv[AES_BLOCK_SIZE];
+    memset(iv, 0x00, sizeof(iv));
+    strncpy((char *) iv, (char *)_iv, sizeof(iv));
+    AES_set_encrypt_key(_encrypt_key, 128, &enc_key);
+    AES_cbc_encrypt(_input_data, data_enc, _data_size, &enc_key, iv, AES_ENCRYPT);
+    return data_enc;
+}
+
+unsigned char *ssys_decrypt_aes_cbc(
+ const unsigned char *_input_data,
+ const unsigned char *_decrypt_key,
+ const unsigned char *_iv,
+ uint16_t _data_size
+){
+    if (_input_data == NULL){
+        ssys_debug(__func__, "ERROR", "null data\n");
+        return NULL;
+    }
+    unsigned char *data_dec = NULL;
+    data_dec = (unsigned char *) malloc((_data_size + 1) * sizeof(unsigned char));
+    if (data_dec == NULL){
+        ssys_debug(__func__, "ERROR", "failed to allocate memory\n");
+        return NULL;
+    }
+    unsigned char iv[AES_BLOCK_SIZE];
+    memset(data_dec, 0x00, (_data_size + 1) * sizeof(unsigned char));
+    AES_KEY dec_key;
+    memset(iv, 0x00, sizeof(iv));
+    strncpy((char *) iv, (const char *)_iv, sizeof(iv));
+    AES_set_decrypt_key(_decrypt_key, 128, &dec_key);
+    AES_cbc_encrypt(_input_data, data_dec, _data_size, &dec_key, iv, AES_DECRYPT);
+    return data_dec;
 }
 
 // mac address
@@ -1065,4 +1234,173 @@ char *ssys_get_process_command(uint16_t _process_pid){
         content = (char *) realloc(content, (num_of_bytes + 1) * sizeof(char));
     }
     return content;
+}
+
+// bash command
+char *ssys_bash_cmd(char *_command, int *_status_result){
+    long time_now = 0;
+    char file_name[13];
+    char buff[strlen(_command) + 4 + sizeof(file_name)];
+    FILE *result_file = NULL;
+    char *result = NULL;
+    result = (char *) malloc(sizeof(buff));
+    uint16_t result_size = 0;
+    if (result == NULL){
+        ssys_debug(__func__, "ERROR", "failed to allocate result memory. process aborted!\n");
+        return NULL;
+    }
+    time(&time_now);
+    memset(file_name, 0x00, sizeof(file_name));
+    sprintf(file_name, "ssysbcmd%i", (int) (time_now % 3600));
+    memset(buff, 0x00, sizeof(buff));
+    sprintf(buff, "%s > %s", _command, file_name);
+
+    *_status_result = system(buff);
+
+    if ((result_file=fopen(file_name, "r")) == NULL){
+        ssys_debug(__func__, "ERROR", "failed to open %s. (cmd res: %i)\n", file_name, *_status_result);
+		free(result);
+        result = NULL;
+        return NULL;
+    }
+
+    memset(buff, 0x00, sizeof(buff));
+    while(fgets(buff, (sizeof(buff) - 1), result_file)!=NULL && result_size < 60000){
+        result_size += strlen(buff);
+        result = (char *) realloc(result, (result_size + 1) * sizeof(char));
+        memcpy(result + (result_size - strlen(buff)), buff, strlen(buff));
+        memset(buff, 0x00, sizeof(buff));
+    }
+    result[result_size] = 0x00;
+    fclose(result_file);
+    remove(file_name);
+    result_file = NULL;
+    return result;
+}
+
+// tty tools
+char *ssys_get_tty_driver(char *_tty_name){
+    FILE *f_check = NULL;
+    char file_name[30 + strlen(_tty_name)];
+    memset(file_name, 0x00, sizeof(file_name));
+    sprintf(file_name, "/sys/class/tty/%s/device/uevent", _tty_name);
+    if ((f_check = fopen(file_name, "r")) == NULL){
+        ssys_debug(__func__, "ERROR", "failed to read \"%s\"\n", _tty_name);
+        return NULL;
+    }
+
+    uint16_t buff_size = 8;
+    uint16_t idx_buff = 0;
+    char *buff = NULL;
+    buff = (char *) malloc(buff_size * sizeof(char));
+    if (buff == NULL){
+        ssys_debug(__func__, "ERROR", "failed to allocate memory\n");
+        fclose(f_check);
+        f_check = NULL;
+        return NULL;
+    }
+    char character = 0;
+    
+    while ((character = fgetc(f_check)) != EOF){
+        if (character < 1 || character > 127 || character <= 13) break;
+        if (idx_buff >= 7){
+            if ((idx_buff - 7) >= buff_size + 2){
+                buff_size += 8;
+                buff = (char *) realloc(buff, buff_size * sizeof(char));
+            }
+            buff[idx_buff - 7] = character;
+        }
+        idx_buff++;
+    }
+    if (idx_buff >= 7){
+        buff[idx_buff - 7] = 0x00;
+    }
+    buff_size = strlen(buff);
+    buff = (char *) realloc(buff, buff_size * sizeof(char));
+    fclose(f_check);
+    f_check = NULL;
+    return buff;
+}
+
+char *ssys_get_tty_by_driver(char *_tty_keyword, char *_driver_name){
+    DIR *d_fd = NULL;
+    struct dirent *d_st = NULL;
+    if ((d_fd = opendir("/sys/class/tty")) == NULL){
+        ssys_debug(__func__, "ERROR", "fail to open tty class directory");
+        return NULL;
+    }
+    char *buff = NULL;
+    while((d_st = readdir(d_fd)) != NULL){
+        if (strstr(d_st->d_name, _tty_keyword) != NULL){
+            buff = ssys_get_tty_driver(d_st->d_name);
+            if (buff != NULL){
+                if (strcmp(buff, _driver_name) == 0){
+                    buff = (char *) realloc(buff, (strlen(d_st->d_name) + 1) * sizeof(char));
+                    strcpy(buff, d_st->d_name);
+                    break;
+                }
+                else {
+                    free(buff);
+                    buff = NULL;
+                }
+            }
+        }
+    }
+    closedir(d_fd);
+    d_fd = NULL;
+    return buff;
+}
+
+char *ssys_list_tty_driver(char *_tty_keyword){
+    DIR *d_fd = NULL;
+    struct dirent *d_st = NULL;
+    if ((d_fd = opendir("/sys/class/tty")) == NULL){
+        ssys_debug(__func__, "ERROR", "fail to open tty class directory");
+        return NULL;
+    }
+    uint16_t str_length = 0;
+    uint16_t str_size = 0;
+
+    char *tty_list = NULL;
+    char *buff = NULL;
+    tty_list = (char *) malloc(3*sizeof(char));
+    if (tty_list == NULL){
+        ssys_debug(__func__, "ERROR", "failed to allocate memory\n");
+        closedir(d_fd);
+        return NULL;
+    }
+    memset(tty_list, 0x00, 3*sizeof(char));
+    while((d_st = readdir(d_fd)) != NULL){
+        if (strstr(d_st->d_name, _tty_keyword) != NULL){
+            buff = ssys_get_tty_driver(d_st->d_name);
+            if (buff != NULL){
+                str_size += (strlen(buff) + strlen(d_st->d_name) + 3);
+                tty_list = (char *) realloc(tty_list, str_size * sizeof(char));
+                memcpy(tty_list + str_length, d_st->d_name, strlen(d_st->d_name));
+                str_length += strlen(d_st->d_name);
+                tty_list[str_length] = '=';
+                str_length++;
+                memcpy(tty_list + str_length, buff, strlen(buff));
+                str_length += strlen(buff);
+                tty_list[str_length] = '\n';
+                str_length++;
+                free(buff);
+                buff = NULL;
+            }
+            else {
+                free(buff);
+                buff = NULL;
+            }
+        }
+    }
+    closedir(d_fd);
+    d_fd = NULL;
+    if (str_length == 0){
+        free(tty_list);
+        tty_list = NULL;
+    }
+    else {
+        tty_list[str_length] = 0x00;
+    }
+    return tty_list;
 }
