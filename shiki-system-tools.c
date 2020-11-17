@@ -25,12 +25,12 @@
 
 int8_t ssys_debug_mode_status = 1;
 
-static void ssys_debug(const char *function_name, char *debug_type, char *debug_msg, ...);
+static void ssys_debug(const char *function_name, const char *debug_type, const char *debug_msg, ...);
 static int *ssys_keyboard_thread(void *_timeout);
-static char *ssys_list_dir_by_name(char *_dir_path, char *_keyword, uint8_t _type);
-static char *ssys_list_dir(char *_dir_path, uint8_t _type);
+static char *ssys_list_dir_by_name(const char *_dir_path, const char *_keyword, uint8_t _type);
+static char *ssys_list_dir(const char *_dir_path, uint8_t _type);
 
-static void ssys_debug(const char *function_name, char *debug_type, char *debug_msg, ...){
+static void ssys_debug(const char *function_name, const char *debug_type, const char *debug_msg, ...){
 	if (ssys_debug_mode_status == 1 || strcmp(debug_type, "INFO") != 0){
         struct tm *d_tm = NULL;
         struct timeval tm_debug;
@@ -113,7 +113,7 @@ char *ssys_get_keyboard_file(){
     return NULL;
 }
 
-FILE *ssys_open_keyboard(char *_file_name){
+FILE *ssys_open_keyboard(const char *_file_name){
     if (_file_name == NULL){
         ssys_debug(__func__, "ERROR", "file name undefined\n");
         return NULL;
@@ -543,8 +543,8 @@ static int *ssys_keyboard_thread(void *_timeout){
 }
 
 int8_t ssys_keyboard_thread_start(){
-	pthread_t qr_thread;
-	if(pthread_create(&qr_thread, NULL, (void*) ssys_keyboard_thread, NULL) == 0) {
+	pthread_t kbd_thread;
+	if(pthread_create(&kbd_thread, NULL, (void* (*)(void *)) ssys_keyboard_thread, NULL) == 0) {
 		ssys_debug(__func__, "INFO", "thread started successfully\n");
 		return 0;
 	}
@@ -575,7 +575,7 @@ float ssys_get_temperature(){
 }
 
 // file and directory
-static char *ssys_list_dir(char *_dir_path, uint8_t _type){
+static char *ssys_list_dir(const char *_dir_path, uint8_t _type){
     DIR *d_fd = NULL;
     struct dirent *d_st = NULL;
     if ((d_fd = opendir(_dir_path)) == NULL){
@@ -628,7 +628,7 @@ static char *ssys_list_dir(char *_dir_path, uint8_t _type){
     return dir_list;
 }
 
-static char *ssys_list_dir_by_name(char *_dir_path, char *_keyword, uint8_t _type){
+static char *ssys_list_dir_by_name(const char *_dir_path, const char *_keyword, uint8_t _type){
     DIR *d_fd = NULL;
     struct dirent *d_st = NULL;
     if ((d_fd = opendir(_dir_path)) == NULL){
@@ -685,23 +685,23 @@ static char *ssys_list_dir_by_name(char *_dir_path, char *_keyword, uint8_t _typ
     return dir_list;
 }
 
-char *ssys_list_directory(char *_dir_path){
+char *ssys_list_directory(const char *_dir_path){
     return ssys_list_dir(_dir_path, 4);
 }
 
-char *ssys_list_file(char *_dir_path){
+char *ssys_list_file(const char *_dir_path){
     return ssys_list_dir(_dir_path, 8);
 }
 
-char *ssys_list_directory_by_name(char *_dir_path, char *_keyword){
+char *ssys_list_directory_by_name(const char *_dir_path, const char *_keyword){
     return ssys_list_dir_by_name(_dir_path, _keyword, 4);
 }
 
-char *ssys_list_file_by_name(char *_dir_path, char *_keyword){
+char *ssys_list_file_by_name(const char *_dir_path, const char *_keyword){
     return ssys_list_dir_by_name(_dir_path, _keyword, 8);
 }
 
-char *ssys_list_file_by_content(char *_dir_path, char *_keyword){
+char *ssys_list_file_by_content(const char *_dir_path, const char *_keyword){
     DIR *d_fd = NULL;
     struct dirent *d_st = NULL;
     if ((d_fd = opendir(_dir_path)) == NULL){
@@ -761,7 +761,7 @@ char *ssys_list_file_by_content(char *_dir_path, char *_keyword){
     return dir_list;
 }
 
-int8_t ssys_check_text_in_file(char *_file, char *_keyword){
+int8_t ssys_check_text_in_file(const char *_file, const char *_keyword){
     FILE *f_check = NULL;
     if ((f_check = fopen(_file, "r")) == NULL){
         ssys_debug(__func__, "ERROR", "failed to read \"%s\"\n", _file);
@@ -811,7 +811,7 @@ int8_t ssys_check_text_in_file(char *_file, char *_keyword){
     return -1;
 }
 
-unsigned long ssys_get_file_size(char *_file){
+unsigned long ssys_get_file_size(const char *_file){
     FILE *f_check;
     if ((f_check = fopen(_file, "r")) == NULL){
         ssys_debug(__func__, "ERROR", "failed to read \"%s\"\n", _file);
@@ -825,7 +825,7 @@ unsigned long ssys_get_file_size(char *_file){
     return file_size;
 }
 
-int8_t ssys_get_checksum_of_file(char *_file_name, unsigned char *_checksum_output){
+int8_t ssys_get_checksum_of_file(const char *_file_name, unsigned char *_checksum_output){
 	FILE *fd_sum = NULL;
     fd_sum = fopen(_file_name, "rb");
 	if (fd_sum == NULL){
@@ -886,7 +886,7 @@ int8_t ssys_get_checksum_of_file(char *_file_name, unsigned char *_checksum_outp
 	return 0;
 }
 
-int8_t ssys_get_checksum(unsigned char *_input, unsigned char *_checksum_output){
+int8_t ssys_get_checksum(const unsigned char *_input, unsigned char *_checksum_output){
 	MD5_CTX context;
 	MD5_Init(&context);
 
@@ -936,12 +936,12 @@ char *ssys_encode_base64(unsigned char *_buff, size_t _length){
     char charset[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
     int index = 0;
     int no_of_bits = 0;
-    int padding = 0;
+    size_t padding = 0;
     int val = 0;
     int count = 0;
     int temp = 0;
-    int i, j;
-    int idx_result = 0; 
+    size_t i, j;
+    size_t idx_result = 0; 
 
     for (i = 0; i < _length; i += 3){ 
         val = 0;
@@ -994,9 +994,9 @@ unsigned char *ssys_decode_base64(unsigned char *_buff, size_t _length){
     }
     memset(result, 0x00, result_size * sizeof(char));
 
-    int i = 0;
-    int j = 0;
-    int idx_result = 0;  
+    size_t i = 0;
+    size_t j = 0;
+    size_t idx_result = 0;  
     int num = 0;
     int count_bits = 0;
     for (i = 0; i < _length; i += 4){ 
@@ -1100,7 +1100,7 @@ unsigned char *ssys_decrypt_aes_cbc(
 }
 
 // mac address
-int8_t ssys_get_mac_address(char* _mac_address, char* _interface){
+int8_t ssys_get_mac_address(char* _mac_address, const char* _interface){
     FILE *mac_file = NULL;
     char *file_name = NULL;
     char *mac_address = NULL;
@@ -1152,7 +1152,7 @@ int8_t ssys_get_mac_address(char* _mac_address, char* _interface){
 }
 
 // process
-uint16_t *sssys_get_process(char *_keyword, int *_n_proccess){
+uint16_t *sssys_get_process(const char *_keyword, int *_n_proccess){
     DIR *d_fd = NULL;
     struct dirent *d_st = NULL;
     const char _dir_path[] = "/proc";
@@ -1237,7 +1237,7 @@ char *ssys_get_process_command(uint16_t _process_pid){
 }
 
 // bash command
-char *ssys_bash_cmd(char *_command, int *_status_result){
+char *ssys_bash_cmd(const char *_command, int *_status_result){
     long time_now = 0;
     char file_name[13];
     char buff[strlen(_command) + 4 + sizeof(file_name)];
@@ -1279,7 +1279,7 @@ char *ssys_bash_cmd(char *_command, int *_status_result){
 }
 
 // tty tools
-char *ssys_get_tty_driver(char *_tty_name){
+char *ssys_get_tty_driver(const char *_tty_name){
     FILE *f_check = NULL;
     char file_name[30 + strlen(_tty_name)];
     memset(file_name, 0x00, sizeof(file_name));
@@ -1322,7 +1322,7 @@ char *ssys_get_tty_driver(char *_tty_name){
     return buff;
 }
 
-char *ssys_get_tty_by_driver(char *_tty_keyword, char *_driver_name){
+char *ssys_get_tty_by_driver(const char *_tty_keyword, const char *_driver_name){
     DIR *d_fd = NULL;
     struct dirent *d_st = NULL;
     if ((d_fd = opendir("/sys/class/tty")) == NULL){
@@ -1351,7 +1351,7 @@ char *ssys_get_tty_by_driver(char *_tty_keyword, char *_driver_name){
     return buff;
 }
 
-char *ssys_list_tty_driver(char *_tty_keyword){
+char *ssys_list_tty_driver(const char *_tty_keyword){
     DIR *d_fd = NULL;
     struct dirent *d_st = NULL;
     if ((d_fd = opendir("/sys/class/tty")) == NULL){
